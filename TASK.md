@@ -2,23 +2,10 @@ W ramach projektu każda grupa powinna wybrać co najmniej jeden zestaw danych z
 
 # Kamienie milowe
 
-## Wybór datasetu
-Wolne tematy:
-- Cotton Candy XES YAML (Power Consumption, Environment, Temperatures, Metrology)
-- Dataset used for Evaluation of Radiant: A Domain-specific Language for Detecting Process Activities from Sensor Streams in IoT 
-- Prototype of an IoT-based Activity Detection Service Generator with Evaluation Datasets
-- Dataset from a Smart Factory to evaluate a Semi-automated Approach to Detecting Process-Level Activities from Sensor Data
-- PCR Lab Data
-- OCEL Chess Pieces Production 
-- CEP-based Activity Detection Services generated from IoT Data
-- An IoT-Enriched Event Log for Process Mining in Smart Factories
-
-My wybraliśmy wstępnie PCR Lab Data. Ale pojawiły się pytania
-Bo niby mamy dużo plików, ale nie wiadomo, czy uda się coś z nich wyciągnąć i zrealizować sensownie wszystkie milestones.
-Dane są w /mnt/adata-disk/projects/agh/2stopien/BusinessModeling/data jest ich tam bardzo dużo, jest plik index.txt w którym są jakieś tam
-inne informacje. Przeanalizuj tak +-, czy ten dataset nada się na te wszystkie milestone, jeśli nie, to zaproponuj jakiś inny ciekawy, z tych wybranych tematów
-Taki, aby był interesujący i ciekawy.
-
+## Milestone 0 - PCR Lab Data
+Przejrzenie zbioru danych https://zenodo.org/records/11617408 PCR Lab Data
+Weryfikacja, czy nie będzie za proste, czy uda się coś sensownego z tego wyciągnąć.
+W taki sposób, aby było możliwe zrealizowanie wszystkich milestone-ów.
 
 ## Milestone 1: Zrozumienie zbioru danych
 
