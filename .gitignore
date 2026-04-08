@@ -1,0 +1,38 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project: raw data (large, downloadable from Zenodo)
+data/raw/
+
+# Project: generated exports
+notebooks/*.html
+reports/01_m1_eda.html
+
+# Project: tool artifacts
+.codex
+.codex/
+.claude/
+.jupyter/
+.ipython/
+.local/
+.cache/
