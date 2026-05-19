@@ -79,7 +79,7 @@ jupyter lab
 Python version: `3.12`
 
 Notebook stack:
-`pandas`, `numpy`, `matplotlib`, `seaborn`, `pyyaml`, `pyarrow`, `tqdm`, `jupyterlab`, `ipykernel`
+`pandas`, `numpy`, `matplotlib`, `seaborn`, `pyyaml`, `pyarrow`, `tqdm`, `scikit-learn`, `umap-learn`, `jupyterlab`, `ipykernel`
 
 ## Layout
 
