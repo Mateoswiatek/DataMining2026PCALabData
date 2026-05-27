@@ -217,7 +217,30 @@ Klastry 4 i 8 to oba `*/backend/corr` — obsługują wiele tych samych zdarzeń
 
 ---
 
-## 6. Wnioski
+## 6. Wykrywanie outlierów (sample)
+
+Cechy per case: `duration_min`, `n_events`, `hour`, `dayofweek`. Normalizacja `StandardScaler`.
+
+| Algorytm | Outlierów | % |
+|---|---:|---:|
+| Isolation Forest (contamination=5%) | 302 | 4.9% |
+| LOF (k=20, contamination=5%) | 309 | 5.0% |
+| DBSCAN (eps=1.5, min_samples=10) | 29 | 0.5% |
+
+DBSCAN wydziela 3 klastry, tylko 29 outlierów — dane są skupione. IF i LOF wykrywają po ~300 próbek.
+
+![Outlierzy — IF, LOF, DBSCAN](../results/m2/fig_outlier_detection.png)
+
+| | duration_min | n_events | hour | dayofweek |
+|---|---:|---:|---:|---:|
+| Normalne | 173.5 | 10 | 16 | 2 |
+| Outlier | 420.8 | 12 | 14 | 3 |
+
+Outlierzy to próbki o ~2.5× dłuższym czasie i więcej zdarzeń — prawdopodobnie utknęły na noc w kolejce do płytki.
+
+---
+
+## 7. Wnioski
 
 1. **Mapowanie jest wiele-do-wielu.** 9 z 15 endpointów obsługuje wiele zdarzeń; jednocześnie wiele zdarzeń korzysta z więcej niż jednego endpointa. Nie istnieje proste mapowanie 1:1 między endpointami a zdarzeniami.
 
@@ -228,3 +251,5 @@ Klastry 4 i 8 to oba `*/backend/corr` — obsługują wiele tych samych zdarzeń
 4. **Endpointy = serwisy wielokrotnego użytku.** Klasteryzacja grupuje endpointy wg funkcji serwisowej (timeout, notyfikacje, korelacja), a nie wg procesu. Endpointy nie są dedykowanymi modułami per zdarzenie — to współdzielone mikroserwisy.
 
 5. **Ograniczenia analizy.** n=15 punktów to minimum dla PCA/UMAP/klasteryzacji. Silhouette (max 0.273) jest niski, ale dendrogram i UMAP dają czytelną strukturę. Przy większej liczbie endpointów (np. w systemie produkcyjnym z setkami serwisów) pipeline byłby bardziej informatywny.
+
+6. **Outlierzy.** IF i LOF wskazują ~5% próbek jako anomalie — głównie te o czasie >400 min (utknęły na noc). DBSCAN: 3 klastry, 29 outlierów. Anomalie wynikają z rytmu pracy laboratorium, nie z błędów procesowych.
