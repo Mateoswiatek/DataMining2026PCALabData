@@ -9,3 +9,7 @@ seaborn>=0.13
 tqdm>=4.66
 scikit-learn>=1.5
 umap-learn>=0.5
+pm4py>=2.7.0
+plotly>=5.0
+networkx>=3.0
+graphviz>=0.20
