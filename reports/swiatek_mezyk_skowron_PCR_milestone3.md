@@ -70,16 +70,18 @@ Dominuje **ścieżka główna**: Match patient data → Wait for plate validatio
 
 ![Performance DFG](../results/m3/fig_dfg_performance.png)
 
-Heatmapa median czasu przejść (w minutach) ujawnia, gdzie czas jest tracony:
+Heatmapa pokazuje czas **complete(A) → complete(B)** w minutach — czas od zakończenia aktywności A do zakończenia aktywności B w tym samym przypadku.
 
-| Przejście | Mediana [min] | n |
-|---|---:|---:|
-| Match patient data → timeout (ścieżka alternatywna) | 420 | 498 |
-| Receive sample state → timeout | 232 | 292 |
-| Match patient data → Wait for plate validation | **162** | **5 444** |
-| Wait for plate validation → Receive sample state | ~0 | 5 921 |
+> **Ważna uwaga o strukturze procesu:** Analiza logów ujawniła, że aktywności `timeout`, `Match patient data` i `Wait for plate validation` **startują równocześnie** (CPEE odpala je równolegle w ramach jednego przypadku). Przykładowy przypadek: wszystkie trzy aktywnościowe zdarzenia `start` mają timestamp `14:17:41`, `Match patient data` kończy się po ~6 sekundach, a `Wait for plate validation` po ~165 minutach. Oznacza to, że wartość 162 min na krawędzi Match patient data → Wait for plate validation to **nie jest czas oczekiwania między aktywnościami** — to service time aktywności `Wait for plate validation` (czas procesowania PCR), który zaczął się równolegle.
 
-Kluczowy wniosek: **162 minuty mediany** na przejściu Match patient data → Wait for plate validation to główne wąskie gardło na ścieżce głównej (dotyczy 88% przypadków). Sam czas wykonania aktywności jest pomijalny (sekundy) — czas jest tracony w oczekiwaniu na kolejne zdarzenie.
+| Przejście | Mediana [min] | n | Interpretacja |
+|---|---:|---:|---|
+| Match patient data → timeout (alt.) | 420 | 498 | Service time timeout na ścieżce alternatywnej |
+| Receive sample state → timeout | 232 | 292 | Ścieżka alternatywna overnight |
+| Match patient data → Wait for plate validation | **162** | **5 444** | ≈ service time WFPV (165 min) — PCR processing |
+| Wait for plate validation → Receive sample state | ~0 | 5 921 | Sekwencyjne, natychmiastowe |
+
+Kluczowy wniosek: **bottleneck to fizyczny czas procesowania PCR (~165 min)**, a nie czas oczekiwania między aktywnościami. System już korzysta z równoległości — wszystkie kroki inicjalizacji startują jednocześnie. Jedyna droga optymalizacji to zmniejszenie rozmiaru partii płytek (mniejsza partia = krótszy czas do zakończenia). 
 
 ---
 
@@ -304,7 +306,7 @@ Sieć potwierdza centralną rolę `*/backend/corr` — łączy się z niemal wsz
 | Send notification → Export to EMS | 285 | 55 | ⚡ Wysokie |
 | Export to EMS → timeout | 194 | 39 | ⚡ Wysokie |
 
-Najistotniejszy bottleneck to **Match patient data → Wait for plate validation** (mediana 162 min, n=5 444). Dotyka 88% przypadków i wynika z oczekiwania na skompletowanie i walidację płytki PCR. To ograniczenie fizyczne (batchowy charakter procesu PCR), ale możliwe do zredukowania przez zmniejszenie rozmiaru partii.
+Najistotniejszy bottleneck to **service time `Wait for plate validation`** (~165 min, n=5 444). Jak pokazała analiza struktury procesu (sekcja 3.2), `Match patient data` i `Wait for plate validation` startują jednocześnie — wartość 162 min na krawędzi DFG to service time PCR, nie czas oczekiwania w kolejce. To ograniczenie fizyczne (batchowy charakter procesu PCR), możliwe do zredukowania przez zmniejszenie rozmiaru partii.
 
 Przejścia `→ timeout (alt.)` o ekstremalnych medianach (420, 232 min) to przypadki z ścieżki alternatywnej — próbki, które po wstępnym przetworzeniu trafiają bezpośrednio do kolejki timeout zamiast do Wait for plate validation. Prawdopodobna przyczyna: brak dostępnej płytki w momencie przetwarzania, skutkujący oczekiwaniem overnight.
 
