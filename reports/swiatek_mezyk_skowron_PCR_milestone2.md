@@ -20,7 +20,7 @@ Klasteryzujemy dane niskopoziomowe logu, żeby odtworzyć kroki procesu i wyjaś
 
 ### Uwaga o danych
 
-Zbiór to log procesowy CPEE, nie telemetria, i nie zawiera fizycznych czujników (nagłówek deklaruje ontologie W3C SSN/SOSA, ale żadne zdarzenie ich nie używa). Najniższym realnym poziomem danych jest payload pojedynczego wywołania w silniku oraz pozycja próbki na płytce 96-dołkowej, i to właśnie klasteryzujemy.
+Zbiór to log procesowy CPEE, nie telemetria, i nie zawiera fizycznych czujników (opis zbioru na Zenodo wprost określa go jako log zdarzeń procesu, a nie surowe pomiary z aparatury). Najniższym realnym poziomem danych jest payload pojedynczego wywołania w silniku oraz pozycja próbki na płytce 96-dołkowej, i to właśnie klasteryzujemy.
 
 Przegląd całego payloadu pokazuje, że poza sygnaturą argumentów i pozycją na płytce log nie zawiera innych klastrowalnych zmiennych niskopoziomowych. Pozostałe pola to identyfikatory (`pid`, `sampleid`, `plateid`, bez znaczenia dla podobieństwa), pole puste albo dane wykluczone powyżej (endpointy, ground truth, czas agregatu). Dobór cech wykorzystuje więc wszystkie dostępne zmienne niskopoziomowe.
 
@@ -147,7 +147,7 @@ Po nazwach czynności jest to: timeout → Match patient data → Wait for plate
 Outlier definiujemy procesowo: jako przypadek, którego sekwencja klastrów zawiera rzadkie przejścia (spoza głównego grafu), a nie po prostu długi czas trwania.
 
 - Przypadków z rzadkimi przejściami: 57 (0.9%).
-- Najrzadsze przejścia (np. `K3 → K1`, `K1 → K3`, `K7 → K7`, pętle) wskazują nietypowe kolejności kroków.
+- Najrzadsze przejścia (np. `K7 → K7`, `K9 → K4`, `K4 → K9`, pętle) wskazują nietypowe kolejności kroków.
 - Dla odniesienia (nie jako kryterium): mediana `duration_min` dla outlierów procesowych wynosi 408 min wobec 175 min dla wszystkich przypadków. Anomalie strukturalne pokrywają się więc z dłuższym czasem.
 
 Outlier jest tu wyjaśniony odkrytym procesem (nietypowa ścieżka klastrów), a nie zdefiniowany z góry przez `duration`.
