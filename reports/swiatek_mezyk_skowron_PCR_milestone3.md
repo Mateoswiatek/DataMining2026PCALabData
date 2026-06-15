@@ -171,6 +171,8 @@ Heuristic Miner: najlepszy model dla tych danych (F1=0.967). Wiernie odwzorowuje
 
 ## 6. Model BPMN i propozycje usprawnień
 
+### 6.1 BPMN z Heuristic Miner (najlepszy F1)
+
 ![BPMN](../results/m3/fig_bpmn.png)
 
 Model BPMN wygenerowano z najlepszego modelu (Heuristic Miner, F1=0.967) przez konwersję Petri net → BPMN w pm4py. Kluczowe elementy:
@@ -178,7 +180,7 @@ Model BPMN wygenerowano z najlepszego modelu (Heuristic Miner, F1=0.967) przez k
 Główna ścieżka (65% przypadków):
 `Start → Match patient data → Wait for plate validation → Receive sample state → Callback timeout → timeout → End`
 
-Ścieżki z eksportem (~35% przypadków). Po `Receive sample state` możliwe gałęzie:
+Ścieżki z eksportem (~13% przypadków, głównie próbki POSITIVE, patrz §7.2). Po `Receive sample state` możliwe gałęzie:
 - `Export result → Export to EMS → Callback timeout`
 - `Export to EMS → Export result → Callback timeout`
 - `Export result → Callback timeout` (bez EMS)
@@ -187,11 +189,31 @@ Główna ścieżka (65% przypadków):
 Ścieżka z powiadomieniem:
 `timeout → Send notification → (Wait for plate validation | Export to EMS | ...)`
 
+### 6.2 BPMN z Inductive Miner (model blokowy)
+
+![BPMN z Inductive Miner](../results/m3/fig_bpmn_im.png)
+
+Inductive Miner zwraca drzewo procesu, które przekłada się wprost na BPMN. Wersja z filtrem rzadkich zachowań (IMf) daje czysty model blokowy z jawnymi bramkami: AND-split (+) inicjalizacji, XOR (×) dla powiadomienia i pętla (*) na `Match patient data`.
+
+Co z tego modelu wynika:
+
+- Proces jest równoległy, nie sekwencyjny: AND-split pokazuje, że `timeout`, łańcuch walidacji płytki i powiadomienie startują jednocześnie po `Match patient data`. To niezależnie potwierdza obserwację z §3.2 i tłumaczy, dlaczego 162 min to service time PCR, a nie czas oczekiwania w kolejce.
+- Jedyna sekwencja krytyczna to `Wait for plate validation → Receive sample state → Callback timeout`. Reszta to równoległe gałęzie poboczne, więc wąskie gardło musi leżeć w tym łańcuchu (i leży: WFPV ~165 min, §9).
+- Powiadomienie to realny wybór (XOR), a nie stały krok procesu.
+- Pętla (*) na `Match patient data` oznacza, że część próbek przechodzi ponowną identyfikację (rework).
+- Eksport nie pojawia się w tym modelu: IMf odfiltrował go jako rzadki (~13%), więc model opisuje „normalny" przebieg bez eksportu, a eksport jest wyjątkiem dla próbek dodatnich (patrz §6.3).
+
+### 6.3 Bramka decyzyjna eksportu (XOR)
+
+![Bramka XOR po Receive sample state: wynik PCR decyduje o gałęzi eksportu](../results/m3/fig_xor_decision.png)
+
+Najważniejsza bramka rozgałęziająca to decyzja o eksporcie po `Receive sample state`: wynik POSITIVE kieruje próbkę do `Export to EMS`, ujemny ją pomija. Regułę wyprowadzamy z danych w §7.2 (86.9% gałęzi eksportu to próbki dodatnie).
+
 ### Propozycje usprawnień
 
 1. Optymalizacja Wait for plate validation (~162 min mediany na ścieżce głównej). To główny bottleneck na ścieżce przetwarzania 88% przypadków. Płytka (wellplate) jest zapełniana próbkami, a walidacja następuje po zebraniu pełnej partii. Redukcja rozmiaru partii lub zwiększenie częstości uruchamiania walidacji mogłaby skrócić ten czas o 30–50%.
 
-2. Równoległe wykonanie eksportów (AND-split). Export result, Export to EMS i Send notification są w danych wykonywane sekwencyjnie, choć logicznie mogą być równoległe (brak zależności danych między nimi). AND-split po `Receive sample state` skróciłby czas zakończenia przypadku o ~20–30 min dla 35% próbek.
+2. Równoległe wykonanie eksportów (AND-split). Export result, Export to EMS i Send notification są w danych wykonywane sekwencyjnie, choć logicznie mogą być równoległe (brak zależności danych między nimi). AND-split po `Receive sample state` skróciłby czas zakończenia przypadku o ~20–30 min dla ~13% próbek z eksportem.
 
 3. SLA dla przypadków przekraczających 8 godzin. P95 czasu trwania wynosi ~19 godzin. Przypadki ze ścieżką alternatywną (Match patient data → timeout, mediana 420 min) są prawdopodobnie wstrzymane przez brak dostępnej płytki lub błąd systemu. Alert lub mechanizm priorytetu po przekroczeniu 8 godzin zmniejszyłby ich liczbę.
 
@@ -211,10 +233,10 @@ Cechy: `duration_min`, `n_events`, `hour`, `dayofweek`. Cel: POSITIVE / NEGATIVE
 
 | Metryka | Wartość |
 |---|---|
-| Baseline (klasa wiodąca) | 0.528 |
-| CV Accuracy (5-fold) | 0.526 ± 0.009 |
+| Baseline (klasa wiodąca) | 0.530 |
+| CV Accuracy (5-fold) | 0.645 ± 0.009 |
 
-CV accuracy jest niemal równe baseline (52.8%), więc wyniku PCR nie da się przewidzieć z cech procesowych. Potwierdza to obserwacje z Milestone 1: czas trwania, liczba zdarzeń, pora dnia i dzień tygodnia są niezależne od wyniku badania. Wynik PCR zależy od biologii próbki, a nie od charakterystyki procesu laboratoryjnego.
+Model bije baseline o ~11 pp (CV 0.645 vs 0.530), ale głównie dzięki `n_events` (ważność 0.75, pozostałe cechy dokładają ~25%). Cechy niezależne od wyniku, czyli czas trwania, pora dnia i dzień tygodnia, są wobec wyniku płaskie (zgodnie z Milestone 1: mediana czasu 183 min dla POSITIVE vs 172 min dla NEGATIVE). Sygnał bierze się stąd, że `n_events` koduje obecność eksportu, a eksport zależy od wyniku (patrz §7.2). Wniosek: wyniku PCR nie da się przewidzieć z cech niezależnych od wyniku (czas, pora, dzień), ale jest on odzwierciedlony w strukturze procesu. Proces nie przewiduje wyniku, tylko na niego reaguje, uruchamiając dla próbek dodatnich gałąź raportującą.
 
 ### 7.2 Predykcja obecności eksportu
 
@@ -224,20 +246,21 @@ Cechy: `duration_min`, `n_events`, `hour`, `dayofweek`, `pcr_binary`. Cel: czy p
 
 | Target | Prevalence | Baseline | CV Accuracy | Top cecha |
 |---|---:|---:|---:|---|
-| is_main_variant | 65.0% | 0.650 | ~0.65 | duration_min |
-| **has_export** | **35.0%** | 0.650 | **0.999** | **n_events** |
-| has_notification | ~20.0% | 0.800 | ~0.98 | n_events |
+| is_main_variant | 66.9% | 0.669 | 0.995 | n_events |
+| has_export | 13.3% | 0.867 | 0.999 | n_events |
+| has_notification | 20.1% | 0.799 | 0.980 | duration_min |
 
-`n_events` niemal idealnie determinuje, czy przypadek ma aktywność eksportu (CV=0.999). Reguła jest prosta i deterministyczna:
+`n_events` przewiduje wszystkie trzy cele niemal idealnie (CV 0.98–0.999), ale to tautologia: każda dodatkowa aktywność (eksport, powiadomienie) zwiększa `n_events`, więc liczba zdarzeń z definicji koduje strukturę wariantu. To nie jest reguła biznesowa.
 
-```
-if n_events >= 7:
-    → case zawiera eksport (Export result / Export to EMS)
-else:
-    → case bez eksportu (główna ścieżka, 5 zdarzeń)
-```
+Co więc decyduje o gałęzi eksportu (bramka XOR)? Po usunięciu tautologicznego `n_events` widać, że eksport jest silnie powiązany z wynikiem PCR:
 
-Liczba zdarzeń wynika bezpośrednio ze struktury wariantu: główna ścieżka ma 5 aktywności (complete), a ścieżki z eksportem 6–8. Nie jest to reguła „decyzyjna" w sensie biznesowym, tylko tautologia wynikająca z definicji wariantu. Właściwe pytanie brzmi: co decyduje o skierowaniu próbki na ścieżkę z eksportem? Dane procesowe nie zawierają tej informacji, a sama decyzja prawdopodobnie pochodzi z zewnętrznego systemu LIS lub protokołu laboratorium.
+| Kierunek zależności | Wartość |
+|---|---:|
+| P(POSITIVE \| jest eksport) | 86.9% |
+| P(eksport \| POSITIVE) | 24.7% |
+| P(eksport \| NEGATIVE) | 3.3% |
+
+Jeśli próbka ma eksport, jest niemal na pewno dodatnia (86.9%). Pozytywy są zgłaszane do systemu epidemiologicznego (EMS), ujemne prawie nigdy (24.7% vs 3.3%, czyli 7.5×). W drugą stronę zależność jest słabsza, bo eksportowanych jest tylko ~25% pozytywów. Wynik dodatni jest więc warunkiem niemal koniecznym eksportu, ale nie wystarczającym. O tym, które pozytywy trafiają do zgłoszenia, decyduje kryterium spoza logu (eksportowane mają wyższe ct, mediana 31 vs 25, czyli słabsze wiremie). To wyjaśnia §7.1: `n_events` koduje obecność eksportu, więc niesie częściowy sygnał o wyniku. Proces nie przewiduje wyniku, tylko na niego reaguje dodatkową gałęzią raportowania.
 
 ---
 
@@ -337,6 +360,20 @@ Dashboard HTML dostępny w pliku [`results/m3/dashboard.html`](../results/m3/das
 
 ## 11. Interpretacja procesu i wnioski
 
+### Porównanie z procesem odkrytym w Milestone 2 (klasteryzacja)
+
+Proces odkryto dwukrotnie: w M3 metodą process mining ze zdarzeń `complete` (8 aktywności biznesowych), a w M2 metodą klasteryzacji niskopoziomowego payloadu zdarzeń (12 klastrów K1–K12). Oba podejścia odtwarzają ten sam rdzeń procesu (zgodność klastrów z ground truth: purity 0.93):
+
+| Aspekt | Proces ze zdarzeń (M3) | Proces z klastrów (M2) |
+|---|---|---|
+| Szkielet główny | Match → Wait for plate validation → Receive sample state → Callback timeout → timeout | K1 → K6 → K4 → K5 → K9 = timeout → Match → Wait → Receive → Callback (te same kroki) |
+| Zakres | tylko proces `sample`: 8 aktywności, 6 166 przypadków | wszystkie typy procesu (sample + wellplate + orkiestracja): 28 aktywności, 6 339 przypadków |
+| *Receive sample state* | jedna aktywność | rozbite na 3 klastry wg pozycji na płytce (K2/K5/K12, mediana 9/35/73) |
+| Gałąź eksportu | modelowana jako bramka XOR | niewidoczna, bo `Export result`/`Export to EMS` mają tę samą sygnaturę argumentów (`pid,sampleid`) co `Match patient data` i zlewają się w klaster K6 |
+| Kolejność `timeout` | ostatnia (sortowanie po `complete`) | pierwsza (sortowanie po `start`), bo te aktywności startują równolegle (patrz §3.2) |
+
+Wniosek: klasteryzacja niskopoziomowa odtwarza rdzeń procesu i dodatkowo wydobywa strukturę przestrzenną (pozycja na płytce), ale nie widzi gałęzi raportujących (eksport), ponieważ różni je wyłącznie ground truth (wynik PCR) świadomie wykluczony z cech w M2. To granica metody: klastry pokazują, *jak* płynie proces, ale nie *dlaczego* się rozgałęzia. To drugie ujawnia dopiero reguła decyzyjna z §7.2 (wynik dodatni uruchamia eksport).
+
 ### Co model mówi o analizowanym systemie?
 
 System PCR Lab to batchowy proces laboratoryjny zarządzany przez silnik procesowy CPEE. Każda próbka przechodzi przez standardową sekwencję kroków: identyfikacja pacjenta → oczekiwanie na kompletację płytki → odczyt wyniku PCR → opcjonalny eksport do systemów zewnętrznych → zamknięcie przypadku. System jest wysoce powtarzalny (65% przypadków na jednej ścieżce) i działa w przewidywalnym rytmie dobowym (pon.–pt., 11:00–21:00).
@@ -353,14 +390,14 @@ System PCR Lab to batchowy proces laboratoryjny zarządzany przez silnik proceso
 
 1. Wait for plate validation (~162 min): oczekiwanie na skompletowanie płytki 96-studzienkowej. To ograniczenie technologiczne procesu PCR, ale redukowalne przez zmniejszenie rozmiaru wsadu.
 2. Ścieżka alternatywna, czyli brak płytki: 498 przypadków z przejściem Match patient data → timeout (mediana 420 min). Próbki bez przypisanej płytki czekają na kolejny cykl pracy laboratorium, często overnight.
-3. Sekwencyjne eksporty: w 35% przypadków aktywności Export result / Export to EMS / Send notification są wykonywane sekwencyjnie, choć mogłyby być równoległe.
+3. Sekwencyjne eksporty: w ścieżkach pobocznych (~35% przypadków: eksport ~13%, powiadomienie ~20%) aktywności Export result / Export to EMS / Send notification są wykonywane sekwencyjnie, choć mogłyby być równoległe.
 
 ### Rekomendacje biznesowe
 
 | Rekomendacja | Wpływ | Trudność |
 |---|---|---|
 | Zmniejszenie rozmiaru partii płytek (96 → 48) | −50% mediany czasu na głównej ścieżce | Średnia |
-| Równoległość eksportów (AND-split) | −20–30 min na 35% przypadków | Niska |
+| Równoległość eksportów (AND-split) | −20–30 min na ~13% przypadków z eksportem | Niska |
 | SLA 8h + alert dla wstrzymanych próbek | Eliminacja outlierów overnight | Niska |
 | Priorytetyzacja próbek pilnych | Skrócenie P95 | Wysoka |
 | Optymalizacja timeout CPEE | Redukcja overhead kolejkowania | Niska |
@@ -369,5 +406,5 @@ System PCR Lab to batchowy proces laboratoryjny zarządzany przez silnik proceso
 
 - Brak zasobów w logu: analizujemy endpointy zamiast pracowników czy urządzeń, więc nie można ocenić obciążenia personelu.
 - Brak atrybutu priorytetu próbki: nie można odróżnić próbek rutynowych od pilnych.
-- Nieznany kontekst zewnętrzny: decyzja o skierowaniu na ścieżkę z eksportem pochodzi z zewnętrznego systemu LIS, którego nie ma w logu. Drzewo decyzyjne (n_events jako determinant) ujawnia tautologię, a nie przyczynę.
+- Zewnętrzny kontekst raportowania: gałąź eksportu jest sterowana wynikiem PCR (POSITIVE → EMS, §7.2), ale log nie tłumaczy wyjątków (3.3% próbek ujemnych również eksportowanych) ani kolejności samych eksportów. Zależy to od konfiguracji zewnętrznego systemu raportowania.
 - Dane z jednego okresu (kwiecień–czerwiec 2023): wzorce mogą różnić się między szczytem pandemii a normalną pracą laboratorium.
